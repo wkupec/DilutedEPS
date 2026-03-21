@@ -18,7 +18,7 @@ pip install -r requirements.txt
 ### 2. Run the app
 
 ```bash
-streamlit run app.py
+streamlit run eps_analyzer/app.py
 ```
 
 The app will open in your browser at `http://localhost:8501`.

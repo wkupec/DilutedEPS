@@ -22,6 +22,7 @@ def _init_db(conn: sqlite3.Connection) -> None:
             ticker      TEXT PRIMARY KEY,
             name        TEXT,
             sector      TEXT,
+            source      TEXT DEFAULT 'unknown',
             last_updated TEXT
         );
 
@@ -33,7 +34,12 @@ def _init_db(conn: sqlite3.Connection) -> None:
             FOREIGN KEY (ticker) REFERENCES companies(ticker)
         );
     """)
-    conn.commit()
+    # Migrate older DBs that lack the source column
+    try:
+        conn.execute("ALTER TABLE companies ADD COLUMN source TEXT DEFAULT 'unknown'")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # column already exists
 
 
 def save_to_cache(data: dict) -> None:
@@ -49,14 +55,16 @@ def save_to_cache(data: dict) -> None:
         for ticker, info in data.items():
             conn.execute(
                 """
-                INSERT INTO companies (ticker, name, sector, last_updated)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO companies (ticker, name, sector, source, last_updated)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(ticker) DO UPDATE SET
                     name=excluded.name,
                     sector=excluded.sector,
+                    source=excluded.source,
                     last_updated=excluded.last_updated
                 """,
-                (ticker, info.get("name", ""), info.get("sector", ""), now),
+                (ticker, info.get("name", ""), info.get("sector", ""),
+                 info.get("source", "unknown"), now),
             )
             # Remove old EPS rows so stale years don't linger
             conn.execute("DELETE FROM eps_data WHERE ticker = ?", (ticker,))
@@ -84,12 +92,13 @@ def load_from_cache() -> dict:
     result: dict = {}
     with _get_connection() as conn:
         _init_db(conn)
-        rows = conn.execute("SELECT ticker, name, sector FROM companies").fetchall()
+        rows = conn.execute("SELECT ticker, name, sector, source FROM companies").fetchall()
         for row in rows:
             ticker = row["ticker"]
             result[ticker] = {
                 "name": row["name"],
                 "sector": row["sector"],
+                "source": row["source"] or "unknown",
                 "eps_by_year": {},
             }
         eps_rows = conn.execute(

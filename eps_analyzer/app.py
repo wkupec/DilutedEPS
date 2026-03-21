@@ -72,7 +72,10 @@ def _run_fetch(force: bool = False) -> None:
         return
 
     total = len(tickers_df)
-    status_placeholder.info(f"Fetching EPS data for {total} tickers… (this may take a few minutes)")
+    status_placeholder.info(
+        f"Fetching EPS data for {total} tickers from SEC EDGAR "
+        f"(with yfinance fallback)… this may take a few minutes."
+    )
 
     def _progress(idx: int, _total: int, ticker: str) -> None:
         frac = idx / _total
@@ -257,7 +260,10 @@ def _render_sidebar() -> tuple[int, str, str, bool]:
     sort_label = st.sidebar.selectbox("Sort by", list(sort_options.keys()))
     sort_col = sort_options[sort_label]
 
-    force_refresh = st.sidebar.button("Refresh Data", help="Bust cache and re-fetch from Yahoo Finance")
+    force_refresh = st.sidebar.button(
+        "Refresh Data",
+        help="Bust cache and re-fetch from SEC EDGAR / Yahoo Finance",
+    )
 
     # Last updated timestamp
     last_updated = get_last_updated()
@@ -271,9 +277,19 @@ def _render_sidebar() -> tuple[int, str, str, bool]:
     else:
         st.sidebar.caption("Cache: not yet populated")
 
+    # Data-source breakdown
+    if st.session_state.eps_data:
+        n_edgar = sum(1 for v in st.session_state.eps_data.values() if v.get("source") == "edgar")
+        n_yf = sum(1 for v in st.session_state.eps_data.values() if v.get("source") == "yfinance")
+        n_none = sum(1 for v in st.session_state.eps_data.values() if v.get("source") == "none")
+        st.sidebar.caption(
+            f"Sources — EDGAR: {n_edgar} | yfinance: {n_yf} | missing: {n_none}"
+        )
+
     st.sidebar.markdown("---")
     st.sidebar.markdown(
-        "**Data:** Yahoo Finance via yfinance  \n"
+        "**Primary data:** SEC EDGAR XBRL API  \n"
+        "**Fallback:** Yahoo Finance via yfinance  \n"
         "**Cache:** Local SQLite (24-hour TTL)"
     )
 
@@ -381,9 +397,18 @@ data is available. Companies must meet **both** criteria every single year in th
 **EPS CAGR** is the compound annual growth rate of diluted EPS from the first to the
 last year of the qualifying streak.
 
-**Data source:** Yahoo Finance via the [yfinance](https://github.com/ranaroussi/yfinance)
-library. Annual income statement data is used; figures may differ slightly from official
-filings due to restatements and Yahoo Finance's data normalisation.
+**EPS CAGR** is the compound annual growth rate of diluted EPS from the first to the
+last year of the qualifying streak.
+
+**Primary data source:** [SEC EDGAR XBRL API](https://data.sec.gov) — official filings,
+free, no API key required, typically 20+ years of history per company. Annual 10-K
+filings are used (`EarningsPerShareDiluted` concept from the US-GAAP taxonomy).
+
+**Fallback data source:** [Yahoo Finance via yfinance](https://github.com/ranaroussi/yfinance)
+— used when EDGAR returns fewer than 2 years of data for a ticker. Yahoo provides
+~4 years of history and may differ slightly from official filings.
+
+The sidebar shows the per-source breakdown after a fetch.
 
 **Cache:** Data is cached locally in a SQLite database for 24 hours. Use the
 "Refresh Data" button to force a re-fetch.

@@ -53,13 +53,19 @@ CAGR = (EPS_end / EPS_start) ^ (1 / (streak_length - 1)) - 1
 - **S&P 500 constituent list** — scraped from the
   [Wikipedia S&P 500 article](https://en.wikipedia.org/wiki/List_of_S%26P_500_companies)
   using `pandas.read_html`.
-- **Annual diluted EPS** — fetched from Yahoo Finance via the
-  [yfinance](https://github.com/ranaroussi/yfinance) library.
+- **Annual diluted EPS (primary)** — [SEC EDGAR XBRL API](https://data.sec.gov).
+  Uses the `EarningsPerShareDiluted` concept from each company's annual 10-K filing.
+  Free, no API key needed, typically 20+ years of history. No scraping — structured
+  XBRL data directly from official filings.
+- **Annual diluted EPS (fallback)** — [Yahoo Finance via yfinance](https://github.com/ranaroussi/yfinance).
+  Used only when EDGAR returns fewer than 2 years of data for a ticker (~4 years max).
 
-> **Disclaimer:** Yahoo Finance data is provided for informational purposes only.
-> Figures may differ from official SEC filings due to restatements or data
-> normalisation applied by Yahoo Finance. Do not use this tool for investment
-> decisions without independently verifying the underlying data.
+The sidebar displays a source breakdown (EDGAR / yfinance / missing) after each fetch.
+
+> **Disclaimer:** EDGAR data reflects what companies reported in their official filings;
+> however, restatements, fiscal year shifts, and XBRL tagging differences can
+> occasionally cause discrepancies. Do not use this tool for investment decisions
+> without independently verifying the underlying data.
 
 ---
 
